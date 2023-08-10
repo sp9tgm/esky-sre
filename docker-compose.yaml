@@ -4,7 +4,7 @@ services:
     image: esky-nginx-image
     build: ./assigment-3
     ports:
-      - "80:80"
+      - "8080:80"
       - "9001:9001"
   go-app:
     container_name: esky-go-app
