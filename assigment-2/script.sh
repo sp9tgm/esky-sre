@@ -1,9 +1,10 @@
 #!/bin/bash
 health=False
-
+BIND_ADDRESS=8080
 health_check(){
     echo "Health check of go-app:"
-    curl -I http://localhost$BIND_ADDRESS/health
+    echo http://localhost:$BIND_ADDRESS/health
+    curl -I http://localhost:$BIND_ADDRESS/health
 }
 cleanup(){
     echo -e "\nCtrl+C detected. Stopping container..:"
@@ -14,7 +15,7 @@ build(){
     docker build -t esky-go-app-image .
 }
 run(){
-    docker run --rm -d -e BIND_ADDRESS=$BIND_ADDRESS --name go-app go-app-image
+    docker run --rm -d -p $BIND_ADDRESS:$BIND_ADDRESS -e BIND_ADDRESS=:$BIND_ADDRESS --name go-app go-app-image
     docker logs go-app
 }
 options=$(getopt -o p:c --long healthcheck,port:  -- "$@")
