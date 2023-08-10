@@ -8,9 +8,10 @@ The second part of Assigment 3 was to prepare docker-compose file, that will lau
 
 ### Running the containers
 
-To run the container go to the main repo directory and run `docker-compose` command.
+To run the container go to the main repo directory and run `docker-compose` commands.
 
 ```bash
+docker-compose build
 docker-compose up -d
 ```
 
@@ -39,3 +40,5 @@ Connection: keep-alive
 
 I'm healthy
 ```
+
+To stop and remove containers run `docker-compose down` command.
