@@ -11,7 +11,7 @@ The second part of Assigment 3 was to prepare docker-compose file, that will lau
 To run the container go to the main repo directory and run `docker-compose` command.
 
 ```bash
-$ docker-compose up -d
+docker-compose up -d
 ```
 
 To check if all requirements are met run this commands:
@@ -27,8 +27,7 @@ Connection: keep-alive
 
 Hello World! 2023-08-10 11:19:07.623848168 +0000 UTC m=+216.052651827
 ```
-
-
+  
 ```bash
 $ curl -i localhost:9001/health
 HTTP/1.1 200 OK
