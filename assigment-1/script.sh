@@ -4,6 +4,8 @@
 zipped_logs='./logs.tar.bz2'
 logs_dir=./logs
 log_file=./logs/logs.log
+METHOD=""
+USER_AGENT=""
 
 help() (
    echo "Usage: $0 [Options]"
@@ -44,7 +46,7 @@ help() (
 )
 
 parse() (
-   grep $1 $log_file | awk '{gsub(/"/, "");print $14,$6}' | sort | sort | uniq -c | sort -rn | awk 'BEGIN {printf "%-17s %-10s %s \n", "ADDRESS","METHOD", "REQUESTS"} {printf ("%-17s %-10s %s\n", $2,$3,$1)}'
+   grep "$USER_AGENT" $log_file |grep "$METHOD" |awk '{gsub(/"/, "");print $14,$6}' | sort | sort | uniq -c | sort -rn | awk 'BEGIN {printf "%-17s %s\n", "ADDRESS", "REQUESTS"} {printf ("%-17s %s\n", $2,$1)}'
 )
 extract() {
    tar -xf $zipped_logs
@@ -59,6 +61,7 @@ options=$(getopt -o h --long help,method:,user-agent: -- "$@")
    exit 1
 }
 
+
 eval set -- "$options"
 while true; do
    case "$1" in
@@ -67,23 +70,12 @@ while true; do
       exit 0
       ;;
    --method)
-      extract
-      echo $2
-      parse $2
-      remove
-      exit 0
+      METHOD=$2
+      echo $METHOD
       ;;
    --user-agent)
-      extract
-      parse $2
-      remove
-      exit 0
-      ;;
-   *)
-      extract
-      parse
-      remove
-      exit 0
+      USER_AGENT=$2
+      echo $USER_AGENT
       ;;
    --)
       shift
@@ -92,3 +84,9 @@ while true; do
    esac
    shift
 done
+
+extract
+parse
+remove
+
+
