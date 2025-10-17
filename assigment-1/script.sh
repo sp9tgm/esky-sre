@@ -1,92 +1,97 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-#variables:
-zipped_logs='./logs.tar.bz2'
-logs_dir=./logs
-log_file=./logs/logs.log
-METHOD=""
-USER_AGENT=""
+set -euo pipefail
 
-help() (
-   echo "Usage: $0 [Options]"
-   echo
-   echo "Script:"
-   echo "    This script allows you to parse HTTP server logs"
-   echo "    By default it shows number of request per unique ip address."
-   echo "    You can also restrict parsing of logs only to provided user agent using --user-agent option"
-   echo "    or group requests count by method for each ip address using --method option."
-   echo
-   echo "Options:"
-   echo "    --user-agent user-agent  Show entries with specified user-agent."
-   echo "    --method                 Group entries per method for unique IP address."
-   echo "    --help | -h              Prints this message."
-   echo "Examples:"
-   echo "// Display IP addresses and requests count:"
-   echo "$0"
-   echo "   ADDRESS           REQUESTS"
-   echo "   10.61.190.251     73"
-   echo "   10.221.134.57     67"
-   echo "   10.243.143.36     65"
-   echo "   10.205.194.30     60"
-   echo "   10.208.93.162     58"
-   echo
-   echo "// Display IP adrresses, methods and requests count per IP/method: "
-   echo "$0 --method"
-   echo "   ADDRESS           METHOD     REQUESTS"
-   echo "   10.167.144.35     GET        10679"
-   echo "   10.77.167.84      GET        10506"
-   echo "   10.77.167.208     GET        10438"
-   echo "// Display IP addresses and requests count per IP only from givern user-agent."
-   echo "$0 --user-agent Mozilla"
-   echo "   ADDRESS           REQUESTS"
-   echo "   10.167.144.35     10679"
-   echo "   10.77.167.84      10506"
-   echo "   10.77.167.208     10438"
-   echo "   10.21.35.251      1243"
-)
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+archive_path="${script_dir}/logs.tar.bz2"
+method_filter=""
+user_agent_filter=""
 
-parse() (
-   grep "$USER_AGENT" $log_file |grep "$METHOD" |awk '{gsub(/"/, "");print $14,$6}' | sort | sort | uniq -c | sort -rn | awk 'BEGIN {printf "%-17s %s\n", "ADDRESS", "REQUESTS"} {printf ("%-17s %s\n", $2,$1)}'
-)
-extract() {
-   tar -xf $zipped_logs
-}
-remove() {
-   rm -r $logs_dir
+print_help() {
+   cat <<'USAGE'
+Usage: script.sh [OPTIONS]
+
+Parse HTTP logs and print the number of requests per unique IP address.
+
+Options:
+  --user-agent PATTERN   Only include requests whose user agent contains PATTERN.
+  --method METHOD        Only include requests matching the HTTP METHOD (e.g. GET).
+  -h, --help             Show this help message and exit.
+USAGE
 }
 
-options=$(getopt -o h --long help,method:,user-agent: -- "$@")
-[ $? -eq 0 ] || {
-   echo "Incorrect options provided"
+error() {
+   echo "$*" >&2
    exit 1
 }
 
-
-eval set -- "$options"
-while true; do
+while [[ $# -gt 0 ]]; do
    case "$1" in
-   -h | --help)
-      help
-      exit 0
-      ;;
-   --method)
-      METHOD=$2
-      echo $METHOD
-      ;;
-   --user-agent)
-      USER_AGENT=$2
-      echo $USER_AGENT
-      ;;
-   --)
-      shift
-      break
-      ;;
+      -h|--help)
+         print_help
+         exit 0
+         ;;
+      --user-agent)
+         shift || error "Missing value for --user-agent"
+         user_agent_filter="$1"
+         ;;
+      --method)
+         shift || error "Missing value for --method"
+         method_filter="$1"
+         ;;
+      *)
+         error "Unknown option: $1"
+         ;;
    esac
-   shift
+   shift || break
 done
 
-extract
-parse
-remove
+[[ -f "$archive_path" ]] || error "Archive not found: $archive_path"
 
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
 
+tar -xjf "$archive_path" -C "$tmp_dir"
+
+if [[ -f "$tmp_dir/logs/logs.log" ]]; then
+   log_file="$tmp_dir/logs/logs.log"
+else
+   log_file=$(find "$tmp_dir" -type f -name 'logs.log' -print -quit)
+fi
+
+[[ -n "${log_file:-}" ]] || error "Unable to find extracted log file"
+
+awk -v method_filter="$method_filter" \
+    -v user_agent_filter="$user_agent_filter" '
+function extract(field,    pattern, start, remaining, endpos) {
+   pattern = field ": \""
+   start = index($0, pattern)
+   if (start == 0) {
+      return ""
+   }
+   remaining = substr($0, start + length(pattern))
+   endpos = index(remaining, "\"")
+   if (endpos == 0) {
+      return ""
+   }
+   return substr(remaining, 1, endpos - 1)
+}
+{
+   method = extract("method")
+   if (method_filter != "" && method != method_filter) {
+      next
+   }
+   ua = extract("user_agent")
+   if (user_agent_filter != "" && index(ua, user_agent_filter) == 0) {
+      next
+   }
+   ip = extract("client_ip")
+   if (ip != "") {
+      print ip
+   }
+}' "$log_file" |
+   sort |
+   uniq -c |
+   sort -rn |
+   awk 'BEGIN { printf "%-17s %s\n", "ADDRESS", "REQUESTS" }
+        { printf "%-17s %s\n", $2, $1 }'
